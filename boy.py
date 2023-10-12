@@ -2,7 +2,7 @@
 import math
 
 from pico2d import load_image, get_time
-from sdl2 import SDL_KEYDOWN, SDLK_SPACE, SDLK_RIGHT, SDLK_LEFT, SDL_KEYUP
+from sdl2 import SDL_KEYDOWN, SDLK_SPACE, SDLK_RIGHT, SDLK_LEFT, SDL_KEYUP, SDLK_a
 
 
 def space_down(e):
@@ -25,8 +25,13 @@ def left_up(e):
     return e[0] == 'INPUT' and e[1].type == SDL_KEYUP and e[1].key == SDLK_LEFT
 
 
+def a_down(e):
+    return e[0] == 'INPUT' and e[1].type == SDL_KEYDOWN and e[1].key == SDLK_a
+
+
 def time_out(e):
     return e[0] == 'TIME_OUT'
+
 
 class Idle:
 
@@ -73,7 +78,7 @@ class Sleep:
                                           -math.pi / 2, '', boy.x + 25, boy.y - 25, 100, 100)
         else:
             boy.image.clip_composite_draw(boy.frame * 100, 300, 100, 100,
-                                          math.pi / 2, '', boy.x - 25, boy.y - 25, 100, 100)
+                                          math.pi / 2, '', boy.x - 25, boy.y - 30, 100, 100)
 
 
 class Run:
@@ -100,14 +105,46 @@ class Run:
         boy.image.clip_draw(boy.frame * 100, boy.action * 100, 100, 100, boy.x, boy.y)
 
 
+class AutoRun:
+    @staticmethod
+    def enter(boy, e):
+        boy.start_time = get_time()
+        if boy.action == 3:
+            boy.dir, boy.action = 1, 1
+        elif boy.action == 2:
+            boy.dir, boy.action = -1, 0
+
+    @staticmethod
+    def exit(boy, e):
+        pass
+
+    @staticmethod
+    def do(boy):
+        boy.frame = (boy.frame + 1) % 8
+        if boy.x > 750:
+            boy.dir = -1
+            boy.action = 0
+        elif boy.x < 50:
+            boy.dir = 1
+            boy.action = 1
+        boy.x += boy.dir * 10
+        if get_time() - boy.start_time > 5:
+            boy.state_machine.handle_event(('TIME_OUT', 0))
+
+    @staticmethod
+    def draw(boy):
+        boy.image.clip_composite_draw(boy.frame * 100, boy.action * 100, 100, 100, 0, '', boy.x, boy.y + 30, 200, 200)
+
+
 class StateMachine:
     def __init__(self, boy):
         self.boy = boy
         self.cur_state = Idle
         self.table = {
-            Idle: {right_down: Run, left_down: Run, right_up: Run, left_up: Run, time_out: Sleep},
+            Idle: {right_down: Run, left_down: Run, right_up: Run, left_up: Run, time_out: Sleep, a_down: AutoRun},
             Run: {right_down: Idle, left_down: Idle, right_up: Idle, left_up: Idle},
-            Sleep: {right_down: Run, left_down: Run, right_up: Run, left_up: Run, space_down: Idle}
+            Sleep: {right_down: Run, left_down: Run, right_up: Run, left_up: Run, space_down: Idle},
+            AutoRun: {right_down: Run, left_down: Run, right_up: Run, left_up: Run, time_out: Idle}
         }
 
     def start(self):
@@ -128,9 +165,6 @@ class StateMachine:
 
     def draw(self):
         self.cur_state.draw(self.boy)
-
-
-
 
 
 class Boy:
